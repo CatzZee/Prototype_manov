@@ -1,0 +1,85 @@
+/* Priora — token desain (gaya pastel-consumer).
+   Warna kuadran dan tipografi dikunci dari SDD 6.2.2 & 6.2.3. */
+
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-ext-700-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+:root {
+  /* Netral — "wajah": ground biru-abu seperti kertas agenda, kontainer tetap putih */
+  --ground: #f2f4f7;
+  --surface: #ffffff;
+  --raised: #f7f8fa;
+  --active: #e3e6eb;      /* pill tab aktif, segmen terpilih */
+  --border: #e2e5e9;      /* tepi kartu */
+  --rule: #eceef1;        /* garis baris & garis jam */
+  --control: #c4c9d0;     /* tepi input & chip */
+  --text: #111418;
+  --muted: #535a63;       /* teks sekunder, ≥ 4,5:1 di ground & surface */
+  --faint: #5f666f;       /* placeholder & meta, ≥ 4,5:1 */
+  --primary: #1d1f20;     /* satu-satunya tombol terisi: hampir hitam */
+  --on-primary: #ffffff;
+  --secondary: #e4e7eb;   /* tombol sekunder: pill abu */
+
+  /* Kuadran — warna latar pastel dengan tinta gelap hue yang sama (SDD 6.2.2 & referensi) */
+  --q1: #C62828; --q1-bg: #FFEBEE; --q1-ink: #B71C1C;
+  --q2: #F9A825; --q2-bg: #FFF8E1; --q2-ink: #6D4C00;
+  --q3: #1565C0; --q3-bg: #E3F2FD; --q3-ink: #0D47A1;
+  --q4: #2E7D32; --q4-bg: #E8F5E9; --q4-ink: #1B5E20;
+  --negative: var(--q1);  /* kekurangan waktu Q1 merah; kuadran lain pakai tinta gelap masing-masing */
+
+  /* Kartu hero gelap untuk Q1 teratas */
+  --card-dark: #15181d;
+  --card-dark-text: #ffffff;
+  --card-dark-muted: #9ba1a6;
+
+  /* Input terisi */
+  --field: #eef1f5;       /* isi input & chip (gaya terisi) */
+  --field-line: #737b85;  /* garis bawah input: 3,78:1 di atas field, 4,28:1 di atas putih (WCAG 1.4.11) */
+
+  /* Identitas mata kuliah: titik kecil, kroma rendah */
+  --course-a: #7d8a99; --course-b: #a08c6e; --course-c: #6f8f8a; --course-d: #9a7f8c; --course-e: #8d9479;
+
+  /* Bentuk — sudut 22px untuk kartu (keputusan desain pastel-consumer) */
+  --r-card: 22px;
+  --r-panel: 12px;
+  --r-pill: 999px;
+  --r-tag: 8px;
+
+  /* Tipe — Plus Jakarta Sans */
+  --font: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --fs-meta: 13px;
+  --fs-body: 16px;
+  --fs-card: 17px;
+  --fs-title: 28px;
+  --fs-fig: 32px;
+
+  /* Ruang — basis 4 */
+  --m: 16px;
+  --gap: 12px;
+  --pad: 16px;
+  --section: 28px;
+  --tap: 48px;
+  --nav-h: 64px;
+  --col: 440px;
+
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: 120ms;
+  --t-move: 220ms;
+}
+
