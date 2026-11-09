@@ -141,6 +141,8 @@ main, .section, .section__body, .panel, .sheet__body, .field { min-width: 0; }
 /* Kartu fokus hero gelap (Ref 1) */
 .task--hero { background: var(--card-dark) !important; color: var(--card-dark-text) !important; border: 1px solid #23272e !important;
   border-left: 6px solid var(--q1) !important; padding: 18px var(--pad); gap: 10px; }
+/* Tepi merah hanya untuk Q1 (SDD 6.2.2): bila tugas teratas bukan Q1 (mis. Q1 sudah selesai), kartu gelap tanpa tepi berwarna */
+.task--hero:not(.q1) { border-left: 1px solid #23272e !important; }
 .task--hero .task__title { font-size: 20px; line-height: 1.3; color: #ffffff !important; }
 .task--hero .task__title a { color: #ffffff !important; }
 .task--hero .task__meta { color: var(--card-dark-muted) !important; }

@@ -166,13 +166,13 @@ Tujuan: fondasi gaya baru dan arsitektur render bersama, tanpa mengubah perilaku
   - Bulan: kisi Oktober 2026 dengan titik deadline berikon kuadran, ketuk hari → tampilan Hari.
   - Hari tanpa data ditampilkan jujur ("Belum ada jadwal").
 - [x] S11a, S11b, S11c: pill blok, kartu dampak, Urungkan 10 detik. _(Selesai. Keterangan blok pendek dipotong satu baris; bug jam ganda di blok mendadak diperbaiki.)_
-- [ ] S14: daftar pengaturan; switch email fail-safe; tombol "Reset data uji". _(Tampilan selesai; saklar diperbesar ke area sentuh 48 px. Tombol "Reset data uji" menunggu `store.js` di Fase 4, jadi belum dicentang.)_
+- [x] S14: daftar pengaturan; switch email fail-safe; tombol "Reset data uji". _(Selesai. Saklar 48 px; tombol Reset memakai dialog konfirmasi dan mengembalikan seluruh data contoh di peramban ini.)_
 - [x] `index.html` galeri ikut diperbarui. _(Selesai: bingkai 390×844. Tautan ke aplikasi/mode uji menyusul di Fase 5.)_
 - Selesai bila: `inspect.mjs --app` 0 FAIL di 15 layar pada 430/390/360/320; `lint.mjs --app` 0/0.
 
 ### Fase 4: `store.js` · M
-- [ ] Skema `{ v, seedVersion, tasks, events, blocks, sudden, applied, settings, snoozes }`, diisi dari salinan `PrioraData`. `seedVersion` berbeda → reset otomatis.
-- [ ] Aksi:
+- [x] Skema `{ v, seedVersion, tasks, events, blocks, sudden, applied, settings, snoozes }`, diisi dari salinan `PrioraData`. `seedVersion` berbeda → reset otomatis. _(Selesai. `events` tetap dari data contoh; `sudden` memakai skenario Rapat BEM dari data.js, hanya `applied` yang disimpan.)_
+- [x] Aksi: _(Selesai semuanya kecuali `addSudden`: kejadian mendadak memakai skenario tetap, jadi cukup `applyPlan`. Tambahan: `toggleStart`, `clearSnooze`, `moveBlock`, `say`/`takeMessage`/`run`.)_
   - `addTask` (Quick Add membuat id baru, skor dihitung engine)
   - `setStatus` (done / in_progress / cancelled / submitted)
   - `snooze(id, menit)` (simpan `snoozedUntil` relatif ke jam beku 09.40, `snoozeCount`)
@@ -183,10 +183,10 @@ Tujuan: fondasi gaya baru dan arsitektur render bersama, tanpa mengubah perilaku
   - `applyPlan({ganti, malam})` dan `undoPlan` (snapshot blok)
   - `setSetting('failsafeEmail')`
   - `reset()`
-- [ ] Persistensi: `localStorage['priora:v1']` dalam try/catch → cadangan `window.name` (bertahan antarlayar di tab yang sama) → cadangan memori dengan notice jujur "Perubahan hanya bertahan di layar ini".
-- [ ] `Store.on(event)` untuk logger uji.
-- [ ] Rencana S11b difilter terhadap state: tugas yang sudah selesai/dibatalkan dilewati, dan notice "skenario Rapat BEM 13.00–16.00" tetap ada bila jamnya berbeda.
-- [ ] Hapus perantara `?msg=` / `?ganti=`; snackbar dipicu dari antrean pesan di store.
+- [x] Persistensi: `localStorage['priora:v1']` dalam try/catch → cadangan `window.name` (bertahan antarlayar di tab yang sama) → cadangan memori dengan notice jujur "Perubahan hanya bertahan di layar ini". _(Selesai dan diuji: data rusak, versi benih beda, localStorage diblokir.)_
+- [x] `Store.on(event)` untuk logger uji. _(Selesai: pendengar menerima `{type, detail}`.)_
+- [x] Rencana S11b difilter terhadap state: tugas yang sudah selesai/dibatalkan dilewati, dan notice "skenario Rapat BEM 13.00–16.00" tetap ada bila jamnya berbeda. _(Selesai.)_
+- [x] Hapus perantara `?msg=` / `?ganti=`; snackbar dipicu dari antrean pesan di store. _(Selesai; satu-satunya parameter tersisa menentukan tampilan: `?view=`, `?id=`, `?state=`, `?beda=`.)_
 - Selesai bila: tambah tugas → muncul di S04/S07/S10 dan punya detail; Selesai/Tunda/progres/override/jadwal ulang bertahan setelah pindah layar dan reload; Reset mengembalikan data contoh; berjalan di `file://` dan `http://`.
 
 ### Fase 5: Mode uji + SEQ + SUS + unduhan · L

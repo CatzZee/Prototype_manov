@@ -1,30 +1,40 @@
-/* Priora — interaksi prototipe. Tanpa framework; berjalan dari file:// maupun server. */
+/* Priora — interaksi prototipe. Tanpa framework; berjalan dari file:// maupun server.
+   Data pengguna ada di PrioraStore (js/store.js). Layar S04, S07, S10, S11c digambar dari data itu oleh PrioraViews;
+   HTML hasil build hanyalah keadaan awal (data contoh) dan cadangan bila JavaScript mati. */
 (function () {
   'use strict';
-  var D = window.PrioraData, E = window.PrioraEngine, R = window.PrioraRender;
+  var Seed = window.PrioraData, E = window.PrioraEngine, R = window.PrioraRender, V = window.PrioraViews, Store = window.PrioraStore;
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var params = new URLSearchParams(location.search);
-  var NOW = E.parse(D.now), NOWH = NOW.getHours() + NOW.getMinutes() / 60;
-  var TASKS = E.enrich(D), byId = {};
-  TASKS.forEach(function (t) { byId[t.id] = t; });
+  var NOW = E.parse(Seed.now), NOWH = NOW.getHours() + NOW.getMinutes() / 60;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var addMin = function (m) { return E.clock(new Date(NOW.getTime() + m * 60000)); };
+  var hmNow = function () { return E.clock(NOW).replace('.', ':'); };
+
+  Store.init(Seed);
+  var bootEl = $('#screen-root[data-boot="s06"]');
+  var screen = bootEl ? 's06' : ((document.querySelector('[data-screen]') || {}).getAttribute ? document.querySelector('[data-screen]').getAttribute('data-screen') : '');
+  var D, M, TASKS, byId;
+  function load() {
+    var d = Store.data();
+    // S11c dibuka tanpa menerapkan apa pun (galeri, tautan langsung): tampilkan rencana contoh, tanpa menyimpannya
+    if (screen === 's11c' && !d.applied) d = Store.data({ simulate: {} });
+    D = d; M = V.model(D); TASKS = M.TASKS; byId = M.byId;
+  }
+  load();
 
   /* ---------- S06: satu halaman, isinya dirender dari ?id= (views.detail) ---------- */
-  var boot = $('#screen-root[data-boot="s06"]');
-  if (boot) {
+  if (bootEl) {
     var bootTask = byId[params.get('id')];
-    boot.outerHTML = bootTask
-      ? window.PrioraViews.detail(bootTask, NOW, D)
+    bootEl.outerHTML = bootTask
+      ? V.detail(bootTask, NOW, D)
       : '<div class="app" data-screen="s06-kosong"><div class="bar"><a class="icon-btn" href="s07-daftar-tugas.html" aria-label="Kembali ke daftar tugas">' + R.icon('arrow_back') + '</a><span class="bar__title">Detail tugas</span></div>' +
         '<main class="section"><div class="panel"><h1 style="font-size:var(--fs-card)">Tugas ini tidak ditemukan</h1><p>Mungkin tugasnya sudah dihapus. Kamu bisa kembali ke daftar tugas.</p>' +
         '<a class="btn btn--secondary" href="s07-daftar-tugas.html" style="justify-self:start">Lihat semua tugas</a></div></main></div>';
     if (bootTask) document.title = bootTask.title + ' · Priora';
     if (location.hash) { var hashEl = document.getElementById(location.hash.slice(1)); if (hashEl) hashEl.scrollIntoView(); }
   }
-
-  var screen = (document.querySelector('[data-screen]') || {}).getAttribute ? document.querySelector('[data-screen]').getAttribute('data-screen') : '';
-  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var addMin = function (m) { return E.clock(new Date(NOW.getTime() + m * 60000)); };
 
   /* ---------- tinggi dock → ruang bawah konten ---------- */
   var dock = $('body > .dock');
@@ -47,72 +57,114 @@
     clearTimeout(snackTimer);
     snackTimer = setTimeout(function () { snackEl.hidden = true; }, o.ms || 6000);
   }
-  var MSG = {
-    added: function () { var q = E.QUAD[params.get('q')] || E.QUAD.Q2; return 'Tersimpan sebagai ' + q.label + '. Pengingat diatur.'; },
-    started: function () { return 'Mulai mengerjakan Laporan Praktikum. Pengingat dijeda sampai ' + addMin(120) + '.'; },
-    done: function () { return 'Laporan Praktikum Basis Data ditandai selesai. Pengingatnya dibatalkan.'; },
-    snooze15: function () { return 'Ditunda 15 menit. Pengingat berbunyi lagi ' + addMin(15) + '.'; },
-    snooze30: function () { return 'Ditunda 30 menit. Pengingat berbunyi lagi ' + addMin(30) + '.'; },
-    snooze60: function () { return 'Ditunda 60 menit. Pengingat berbunyi lagi ' + addMin(60) + '.'; },
-    resched: function () { return 'Blok kerja dipindah. Pengingat diatur ulang.'; },
-    undo: function () { return 'Jadwal dikembalikan seperti semula.'; },
-    event: function () { return 'Kegiatan disimpan. Tidak ada yang bertabrakan.'; }
-  };
+  // Pesan yang dititipkan layar sebelumnya (Store.say), dengan tombol Urungkan bila ada
+  function showQueued() {
+    var q = Store.takeMessage(); if (!q) return;
+    snack(q.text, { ms: 7000, undo: q.undo ? function () { Store.run(q.undo); refresh(); snack('Dikembalikan.'); } : null });
+  }
 
-  /* ---------- aksi pada kartu & dock ---------- */
+  /* ---------- gambar ulang layar dari data tersimpan ---------- */
+  var s07 = { fq: 'all', fc: 'all', term: '' };
+  function mount() {
+    var app = $('.app');
+    if (screen === 's04') { app.innerHTML = V.hariIniMain(M); applyS04State(); bindSwipe(); }
+    else if (screen === 's07') { app.innerHTML = V.daftarMain(M); initS07(); }
+    else if (screen === 's10') { app.innerHTML = V.kalenderMain(M); initS10(); }
+    else if (screen === 's11c') { app.innerHTML = V.diterapkanMain(M); }
+    var behind = $('.behind .app'); if (behind) behind.innerHTML = V.hariIniMain(M, { behind: true });
+  }
+  function refresh() { load(); mount(); }
+
+  /* ---------- aksi pada kartu & dock (data-act) ---------- */
   function cardOf(el) { return el.closest('[data-task]'); }
+  function detailId() { var d = $('[data-detail]'); return d ? d.getAttribute('data-detail') : null; }
   function stateLine(scope) { return $('[data-state-line]', scope) || $('[data-state-line]'); }
-  function hideCard(card, text) {
-    if (!card) { snack(text); return; }
-    card.style.opacity = '0'; card.style.transform = 'translateX(24px)';
-    setTimeout(function () { card.hidden = true; card.style.opacity = ''; card.style.transform = ''; }, reduce ? 0 : 220);
-    snack(text, { undo: function () { card.hidden = false; } });
+  // Menutup tugas (selesai / sudah dikumpulkan / dibatalkan): kartu keluar, data disimpan, ada Urungkan
+  function closeTask(card, id, how, text) {
+    Store.setStatus(id, 'done', how);
+    var undoSpec = { fn: 'setStatus', args: [id, 'todo'] };
+    var inList = card && (screen === 's04' || screen === 's07');
+    var go = function () {
+      if (inList) { refresh(); snack(text, { undo: function () { Store.run(undoSpec); refresh(); } }); }
+      else { Store.say(text, undoSpec); location.href = 's04-hari-ini.html'; }
+    };
+    if (inList) { card.style.opacity = '0'; card.style.transform = 'translateX(24px)'; setTimeout(go, reduce ? 0 : 220); } else go();
   }
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-act]');
     if (!b) return;
-    var card = cardOf(b), id = card ? card.getAttribute('data-task') : (document.querySelector('[data-detail]') || {}).getAttribute ? $('[data-detail]').getAttribute('data-detail') : null;
+    var card = cardOf(b), id = card ? card.getAttribute('data-task') : detailId();
     var t = byId[id] || {};
     var act = b.getAttribute('data-act');
     if (act === 'start') {
-      var line = stateLine(card || document);
-      var on = b.getAttribute('aria-pressed') !== 'true';
-      b.setAttribute('aria-pressed', on);
-      b.lastChild.textContent = on ? 'Jeda' : (card ? 'Mulai' : 'Mulai mengerjakan');
-      b.firstChild.innerHTML = window.PrioraIcons[on ? 'pause' : 'play_arrow'];
-      if (line) { line.hidden = !on; line.innerHTML = R.icon('play_arrow', 'icon--xs') + 'Sedang dikerjakan sejak ' + E.clock(NOW) + ' · pengingat dijeda sampai ' + addMin(120); }
+      var on = Store.toggleStart(id, hmNow());
+      if (screen === 's06') {
+        var line = stateLine(document);
+        b.setAttribute('aria-pressed', on);
+        b.lastChild.textContent = on ? 'Jeda' : 'Mulai mengerjakan';
+        b.firstChild.innerHTML = window.PrioraIcons[on ? 'pause' : 'play_arrow'];
+        if (line) { line.hidden = !on; line.innerHTML = R.icon('play_arrow', 'icon--xs') + 'Sedang dikerjakan sejak ' + E.clock(NOW) + ' · pengingat dijeda sampai ' + addMin(120); }
+      } else refresh();
       snack(on ? 'Selamat mengerjakan. Pengingat dijeda 2 jam.' : 'Dijeda. Pengingat aktif lagi.');
     } else if (act === 'done') {
-      hideCard(card, (t.title || 'Tugas') + ' ditandai selesai. Pengingatnya dibatalkan.');
+      closeTask(card, id, 'done', (t.title || 'Tugas') + ' ditandai selesai. Pengingatnya dibatalkan.');
     } else if (act === 'snooze') {
-      snack('Ditunda 30 menit. Pengingat berbunyi lagi ' + addMin(30) + '.', { undo: function () { snack('Penundaan dibatalkan.'); } });
+      var sn = Store.snooze(id, 30, hmNow());
+      if (screen === 's06') { Store.say('Ditunda 30 menit. Pengingat berbunyi lagi ' + E.hm(sn.until) + '.', { fn: 'clearSnooze', args: [id] }); location.href = 's04-hari-ini.html'; return; }
+      refresh();
+      snack('Ditunda 30 menit. Pengingat berbunyi lagi ' + E.hm(sn.until) + '.' + (sn.count >= 3 ? ' Sepertinya waktunya kurang pas. Mau atur ulang jadwal?' : ''), { undo: function () { Store.clearSnooze(id); refresh(); } });
     } else if (act === 'submitted') {
-      hideCard(card, (t.title || 'Tugas') + ' ditandai sudah dikumpulkan.');
+      closeTask(card, id, 'submitted', (t.title || 'Tugas') + ' ditandai sudah dikumpulkan.');
     } else if (act === 'cancel') {
-      snack('Tugas dibatalkan. Tetap tercatat untuk refleksi mingguan.', { undo: function () {} });
+      closeTask(card, id, 'cancelled', 'Tugas dibatalkan. Tetap tercatat untuk refleksi mingguan.');
     } else if (act === 'newdeadline') {
       var v = $('#nd').value; if (!v) return;
-      snack('Deadline baru disimpan: ' + E.deadlineText({ deadline: v }, NOW) + '. Prioritas dihitung ulang.');
+      Store.setDeadline(id, v);
+      Store.say('Deadline baru disimpan: ' + E.deadlineText({ deadline: v }, NOW) + '. Prioritas dihitung ulang.');
+      location.reload();
+    }
+  });
+
+  /* ---------- tautan yang melakukan sesuatu sebelum pindah layar (data-do) ---------- */
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest('[data-do]'); if (!a) return;
+    var what = a.getAttribute('data-do'), id = a.getAttribute('data-id'), t = byId[id] || {};
+    if (what === 'start') {
+      var on = Store.toggleStart(id, hmNow());
+      Store.say(on ? 'Mulai mengerjakan ' + (t.title || 'tugas') + '. Pengingat dijeda sampai ' + addMin(120) + '.' : 'Dijeda. Pengingat aktif lagi.');
+    } else if (what === 'done') {
+      Store.setStatus(id, 'done');
+      Store.say((t.title || 'Tugas') + ' ditandai selesai. Pengingatnya dibatalkan.', { fn: 'setStatus', args: [id, 'todo'] });
+    } else if (what === 'snooze') {
+      var min = Number(a.getAttribute('data-min')) || 15, sn = Store.snooze(id, min, hmNow());
+      Store.say('Ditunda ' + min + ' menit. Pengingat berbunyi lagi ' + E.hm(sn.until) + '.' + (sn.count >= 3 ? ' Sepertinya waktunya kurang pas. Mau atur ulang jadwal?' : ''), { fn: 'clearSnooze', args: [id] });
+    } else if (what === 'resched') {
+      Store.moveBlock(id, a.getAttribute('data-start'), a.getAttribute('data-end'));
+      Store.say('Blok kerja dipindah. Pengingat diatur ulang.');
+    } else if (what === 'undoplan') {
+      Store.undoPlan(); Store.say('Jadwal dikembalikan seperti semula.');
     }
   });
 
   /* ---------- geser kartu fokus (kanan = selesai, kiri = tunda); tombol tetap tersedia ---------- */
-  $$('[data-swipe]').forEach(function (card) {
-    var x0 = null, dx = 0, moved = false;
-    card.addEventListener('pointerdown', function (e) { if (e.target.closest('button')) return; x0 = e.clientX; dx = 0; moved = false; });
-    card.addEventListener('pointermove', function (e) {
-      if (x0 === null) return; dx = e.clientX - x0;
-      if (Math.abs(dx) > 10) { moved = true; card.style.transition = 'none'; card.style.transform = 'translateX(' + dx * 0.6 + 'px)'; }
+  function bindSwipe() {
+    $$('[data-swipe]').forEach(function (card) {
+      var x0 = null, dx = 0, moved = false;
+      card.addEventListener('pointerdown', function (e) { if (e.target.closest('button')) return; x0 = e.clientX; dx = 0; moved = false; });
+      card.addEventListener('pointermove', function (e) {
+        if (x0 === null) return; dx = e.clientX - x0;
+        if (Math.abs(dx) > 10) { moved = true; card.style.transition = 'none'; card.style.transform = 'translateX(' + dx * 0.6 + 'px)'; }
+      });
+      function end() {
+        if (x0 === null) return; card.style.transition = ''; card.style.transform = '';
+        if (dx > 90) $('[data-act="done"]', card).click();
+        else if (dx < -90) $('[data-act="snooze"]', card).click();
+        x0 = null;
+      }
+      card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end); card.addEventListener('pointerleave', end);
+      card.addEventListener('click', function (e) { if (moved) { e.preventDefault(); moved = false; } }, true);
     });
-    function end() {
-      if (x0 === null) return; card.style.transition = ''; card.style.transform = '';
-      if (dx > 90) $('[data-act="done"]', card).click();
-      else if (dx < -90) $('[data-act="snooze"]', card).click();
-      x0 = null;
-    }
-    card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end); card.addEventListener('pointerleave', end);
-    card.addEventListener('click', function (e) { if (moved) { e.preventDefault(); moved = false; } }, true);
-  });
+  }
 
   /* ---------- grup radio umum (chips, seg) ---------- */
   function radioGroup(root, cb) {
@@ -152,23 +204,21 @@
   if (document.body.classList.contains('is-sheet')) { var first = $('.sheet input, .sheet button'); if (first && !params.get('nofocus')) first.focus({ preventScroll: true }); }
 
   /* ================= S04 Hari Ini ================= */
-  if (screen === 's04') {
-    var st = params.get('state');
+  function applyS04State() {
+    var st = params.get('state'), status = $('[data-sync]');
     var swap = function (sel, tpl) { var el = $(sel), t = document.getElementById(tpl); if (el && t) el.innerHTML = t.innerHTML; };
-    var status = $('[data-sync]');
-    if (st === 'kosong') { $('.summary').hidden = true; swap('#fokus .section__body', 'tpl-kosong-fokus'); swap('#jadwal .section__body', 'tpl-kosong-jadwal'); $('#lain').hidden = true; $('#terlewat').hidden = true; }
-    if (st === 'memuat') { $('.summary').hidden = true; swap('#fokus .section__body', 'tpl-memuat-fokus'); swap('#jadwal .section__body', 'tpl-memuat-jadwal'); $('#lain').hidden = true; $('#terlewat').hidden = true; }
+    var hide = function (sel) { var el = $(sel); if (el) el.hidden = true; };
+    if (st === 'kosong' || st === 'memuat') {
+      hide('.summary'); hide('#lain'); hide('#terlewat');
+      swap('#fokus .section__body', 'tpl-' + st + '-fokus'); swap('#jadwal .section__body', 'tpl-' + st + '-jadwal');
+    }
     if (st === 'offline') { $('[data-notice]').innerHTML = $('#tpl-offline').innerHTML; status.innerHTML = R.icon('cloud_off') + 'Offline'; status.classList.add('status--warn'); }
     if (st === 'error') {
       $('[data-notice]').innerHTML = $('#tpl-error').innerHTML; status.innerHTML = R.icon('sync_problem') + 'Belum tersinkron'; status.classList.add('status--warn');
       $('[data-retry]').addEventListener('click', function () { $('[data-notice]').innerHTML = ''; status.innerHTML = R.icon('sync') + 'Tersinkron ' + E.clock(NOW); status.classList.remove('status--warn'); snack('Tersinkron. Semua perubahan sudah di cloud.'); });
     }
-    var m = params.get('msg');
-    if (m && MSG[m]) {
-      snack(MSG[m](), { ms: 7000 });
-      if (m === 'done') { var hc = $('[data-task="laporan"]'); if (hc) hc.hidden = true; }
-      if (m === 'started') { var sb = $('[data-task="laporan"] [data-act="start"]'); if (sb) { sb.click(); snack(MSG.started(), { ms: 7000 }); } }
-    }
+    // Penyimpanan tidak tersedia (mis. mode privat yang menolak localStorage dan window.name): katakan apa adanya
+    if (!st && Store.mode() === 'memory') $('[data-notice]').innerHTML = '<div class="notice" role="status">' + R.icon('info') + '<span>Penyimpanan di peramban ini tidak tersedia. Perubahan hanya bertahan selama halaman ini terbuka.</span></div>';
   }
 
   /* ================= S05a Quick Add ================= */
@@ -210,8 +260,11 @@
     qa.addEventListener('submit', function (e) {
       e.preventDefault();
       if (!title.value.trim()) { $('[data-err]').hidden = false; title.setAttribute('aria-invalid', 'true'); title.focus(); return; }
-      var r = preview();
-      location.href = 's04-hari-ini.html?msg=added&q=' + r.quadrant;
+      var deadline = dl === 'pick' ? (date.value || DL.week) : DL[dl];
+      var task = Store.addTask({ title: title.value, course: $('#qa-course').value, category: cat.value, est: est.value, importance: imp, deadline: deadline });
+      load();
+      Store.say('Tersimpan sebagai ' + E.QUAD[byId[task.id].quadrant].label + '. Pengingat diatur.');
+      location.href = 's04-hari-ini.html';
     });
     preview();
   }
@@ -219,7 +272,7 @@
   /* ================= S06 Detail ================= */
   var det = $('[data-detail]');
   if (det) {
-    var t = byId[det.getAttribute('data-detail')], prog = t.progress / 100, lock = null;
+    var t = byId[det.getAttribute('data-detail')], prog = t.progress / 100, lock = t.override || null;
     function recalc() {
       var r = E.score({ T: t.T, H: D.settings.productiveHours, E: t.est, p: prog, I: t.importance, W: t.W });
       var q = lock || r.quadrant;
@@ -239,46 +292,52 @@
       }
       return r;
     }
+    if (!t.overdue) recalc(); // tampilkan keadaan tersimpan (progres, kunci prioritas) sejak awal
     radioGroup($('[data-progress]'), function (v) {
       var before = recalc().quadrant; prog = Number(v) / 100; var after = recalc().quadrant;
+      Store.setProgress(t.id, Number(v));
       snack('Progres ' + v + '%. ' + (before !== after ? 'Prioritas berubah ke ' + E.QUAD[after].label + '.' : 'Prioritas tetap ' + E.QUAD[after].label + '.'));
     });
     radioGroup($('[data-override]'), function (v) {
-      lock = v === 'auto' ? null : v; recalc();
+      lock = v === 'auto' ? null : v; recalc(); Store.setOverride(t.id, lock);
       $('[data-ov-hint]').textContent = lock ? 'Dikunci ke ' + E.QUAD[lock].label + ' sampai deadline atau kepentingan diubah. Pengingat mengikuti tier ini.' : 'Otomatis mengikuti perhitungan. Kunci bila menurutmu sistem keliru.';
     });
   }
 
   /* ================= S07 Daftar tugas ================= */
-  if (screen === 's07') {
-    var fq = 'all', fc = 'all', search = $('#cari'), courseSel = $('[data-course]');
+  function initS07() {
+    var search = $('#cari'), courseSel = $('[data-course]');
     var QLABEL = { all: 'semua tugas', OD: 'Terlewat', Q1: 'Kerjakan Sekarang', Q2: 'Jadwalkan', Q3: 'Selesaikan Cepat', Q4: 'Bisa Ditunda' };
     function apply() {
-      var term = search.value.trim().toLowerCase(), any = false, shown = 0;
+      var term = s07.term.trim().toLowerCase(), any = false;
       $$('[data-grp]').forEach(function (g) {
         var n = 0;
         $$('[data-task]', g).forEach(function (c) {
-          var ok = (fq === 'all' || c.getAttribute('data-q') === fq) && (fc === 'all' || c.getAttribute('data-course') === fc) &&
+          var ok = (s07.fq === 'all' || c.getAttribute('data-q') === s07.fq) && (s07.fc === 'all' || c.getAttribute('data-course') === s07.fc) &&
             (!term || c.textContent.toLowerCase().indexOf(term) > -1);
           c.hidden = !ok; if (ok) n++;
         });
-        g.hidden = n === 0; $('[data-grp-count]', g).textContent = n; if (n) any = true; shown += n;
+        g.hidden = n === 0; $('[data-grp-count]', g).textContent = n; if (n) any = true;
       });
-      $('[data-empty]').hidden = any;
-      // Ringkasan saringan di judul lipatan: "Kerjakan Sekarang · Statistika"
-      $('[data-filter-label]').textContent = (fq === 'all' && fc === 'all') ? QLABEL.all : [fq === 'all' ? '' : QLABEL[fq], fc === 'all' ? '' : fc].filter(Boolean).join(' · ');
+      var empty = $('[data-empty]'); empty.hidden = any && $$('[data-grp]').length > 0;
+      $('[data-filter-label]').textContent = (s07.fq === 'all' && s07.fc === 'all') ? QLABEL.all : [s07.fq === 'all' ? '' : QLABEL[s07.fq], s07.fc === 'all' ? '' : s07.fc].filter(Boolean).join(' · ');
     }
-    radioGroup($('[data-filter]'), function (v) { fq = v; apply(); });
-    courseSel.addEventListener('change', function () { fc = courseSel.value; apply(); });
-    search.addEventListener('input', apply);
-    $('[data-reset]').addEventListener('click', function () { fq = 'all'; fc = 'all'; search.value = ''; courseSel.value = 'all'; $$('[data-filter] [role="radio"]').forEach(function (x) { x.setAttribute('aria-checked', x.getAttribute('data-v') === 'all'); }); apply(); });
+    // pulihkan saringan sebelum gambar ulang (mis. setelah menandai selesai)
+    search.value = s07.term; courseSel.value = $$('option', courseSel).some(function (o) { return o.value === s07.fc || o.textContent === s07.fc; }) ? s07.fc : 'all';
+    if (courseSel.value === 'all') s07.fc = 'all';
+    $$('[data-filter] [role="radio"]').forEach(function (x) { x.setAttribute('aria-checked', x.getAttribute('data-v') === s07.fq); });
+    radioGroup($('[data-filter]'), function (v) { s07.fq = v; apply(); });
+    courseSel.addEventListener('change', function () { s07.fc = courseSel.value; apply(); });
+    search.addEventListener('input', function () { s07.term = search.value; apply(); });
+    $('[data-reset]').addEventListener('click', function () { s07.fq = 'all'; s07.fc = 'all'; s07.term = ''; search.value = ''; courseSel.value = 'all'; $$('[data-filter] [role="radio"]').forEach(function (x) { x.setAttribute('aria-checked', x.getAttribute('data-v') === 'all'); }); apply(); });
+    apply();
   }
 
   /* ================= S10 Kalender: Hari / Minggu / Bulan ================= */
-  if (screen === 's10') {
-    var Vw = window.PrioraViews, TODAY = NOW.getDate();
-    var HARI = { Min: 18, Sen: 19, Sel: 20, Rab: 21, Kam: 22, Jum: 23, Sab: 24 };
-    var cal = { view: ['day', 'week', 'month'].indexOf(params.get('view')) > -1 ? params.get('view') : 'day', day: Number(params.get('d')) || HARI[params.get('hari')] || TODAY };
+  var HARI = { Min: 18, Sen: 19, Sel: 20, Rab: 21, Kam: 22, Jum: 23, Sab: 24 };
+  var cal = { view: ['day', 'week', 'month'].indexOf(params.get('view')) > -1 ? params.get('view') : 'day', day: Number(params.get('d')) || HARI[params.get('hari')] || NOW.getDate() };
+  function initS10() {
+    var TODAY = NOW.getDate();
     var panels = { day: $('[data-panel="day"]'), week: $('[data-panel="week"]'), month: $('[data-panel="month"]') };
     var subEl = $('[data-cal-sub]'), weekbar = $('[data-weekbar]'), soloEl = $('[data-day-solo]'), todayEl = $('[data-day-today]');
     function paintCal() {
@@ -295,7 +354,7 @@
       var other = cal.day !== TODAY;
       todayEl.hidden = other; soloEl.hidden = !other;
       $('.legend', panels.day).hidden = other;
-      if (other) soloEl.innerHTML = '<div class="wk-day__body" style="margin-top:12px">' + Vw.dayAgenda(cal.day, TASKS, NOW, D) + '</div>';
+      if (other) soloEl.innerHTML = '<div class="wk-day__body" style="margin-top:12px">' + V.dayAgenda(cal.day, TASKS, NOW, D) + '</div>';
       try { history.replaceState(null, '', '?view=' + cal.view + '&d=' + cal.day); } catch (e) { /* file:// tertentu menolak; tidak penting */ }
     }
     radioGroup($('[data-view]'), function (v) { cal.view = v; paintCal(); });
@@ -320,7 +379,7 @@
       if (b <= a) { box.innerHTML = '<p style="color:var(--text)">Jam selesai harus setelah jam mulai.</p>'; btn.setAttribute('aria-disabled', 'true'); return 'bad'; }
       btn.removeAttribute('aria-disabled');
       var hits = D.blocks.filter(function (x) { return toH(x.start) < b && toH(x.end) > a; });
-      var dues = TASKS.filter(function (x) { var d = E.parse(x.deadline); return !x.overdue && d.toDateString() === NOW.toDateString() && (d.getHours() + d.getMinutes() / 60) >= a && (d.getHours() + d.getMinutes() / 60) <= b; });
+      var dues = TASKS.filter(function (x) { var d = E.parse(x.deadline); return !x.overdue && x.status !== 'done' && d.toDateString() === NOW.toDateString() && (d.getHours() + d.getMinutes() / 60) >= a && (d.getHours() + d.getMinutes() / 60) <= b; });
       if (!hits.length && !dues.length) {
         box.innerHTML = '<p style="color:var(--text)"><b>Tidak ada yang bertabrakan.</b> Simpan saja sebagai kegiatan.</p>';
         btn.textContent = 'Simpan kegiatan'; return 'free';
@@ -339,7 +398,8 @@
     s.addEventListener('change', impact); en.addEventListener('change', function () { $$('[data-dur] [role="radio"]').forEach(function (x) { x.setAttribute('aria-checked', 'false'); }); impact(); });
     km.addEventListener('submit', function (e) {
       e.preventDefault(); var r = impact(); if (r === 'bad') return;
-      location.href = r === 'free' ? 's04-hari-ini.html?msg=event' : 's11b-pratinjau-jadwal-ulang.html' + (s.value !== D.sudden.start || en.value !== D.sudden.end ? '?beda=1' : '');
+      if (r === 'free') { Store.say('Kegiatan disimpan. Tidak ada yang bertabrakan.'); location.href = 's04-hari-ini.html'; return; }
+      location.href = 's11b-pratinjau-jadwal-ulang.html' + (s.value !== D.sudden.start || en.value !== D.sudden.end ? '?beda=1' : '');
     });
     impact();
   }
@@ -351,6 +411,12 @@
       n.innerHTML = R.icon('info') + '<span>Prototipe ini memakai skenario Rapat BEM 13.00–16.00 untuk usulan di bawah.</span>';
       $('main').insertBefore(n, $('main').firstChild);
     }
+    // Tugas yang sudah selesai tidak perlu dipindahkan: lewati usulannya, dan sembunyikan "kurang waktu" bila Laporan sudah selesai
+    $$('[data-move]').forEach(function (m) { var tt = byId[m.getAttribute('data-move')]; if (!tt || tt.status === 'done') m.hidden = true; });
+    var nPlan = $$('[data-move]').filter(function (m) { return !m.hidden; }).length;
+    $('[data-plan-count]').textContent = nPlan + ' perubahan';
+    if (!nPlan) { var none = document.createElement('p'); none.className = 'field__hint'; none.textContent = 'Semua tugas yang terdampak sudah selesai, jadi tidak ada yang perlu dipindahkan.'; $('[data-move]').parentNode.appendChild(none); }
+    if (!byId.laporan || byId.laporan.status === 'done') $('#rk').hidden = true;
     var swapped = {}, fix = {};
     $$('[data-move]').forEach(function (m) {
       var alt = JSON.parse(m.getAttribute('data-alt'))[0], orig = m.getAttribute('data-to'), id = m.getAttribute('data-move');
@@ -358,7 +424,6 @@
         swapped[id] = !swapped[id];
         $('[data-to-text]', m).textContent = swapped[id] ? alt : orig;
         snack('Slot ' + byId[id].title + ' diganti ke ' + (swapped[id] ? alt : orig) + '.');
-        link();
       });
     });
     var FIX = { malam: 'Blok tambahan 20.00–22.00 ikut dijadwalkan (total 4 j dari 6 j yang dibutuhkan).', estimasi: 'Estimasi diturunkan ke 4 jam; waktu tersedia cukup.', perpanjang: 'Catatan dibuat: hubungi asisten praktikum untuk minta perpanjangan.' };
@@ -367,37 +432,16 @@
         var v = c.getAttribute('data-v'); fix[v] = !fix[v]; c.setAttribute('aria-pressed', fix[v]);
         var txt = Object.keys(fix).filter(function (k) { return fix[k]; }).map(function (k) { return FIX[k]; }).join(' ');
         $('[data-fix-text]').textContent = txt || 'Belum ada yang dipilih.';
-        link();
       });
     });
-    function link() {
-      var q = [];
-      var sw = Object.keys(swapped).filter(function (k) { return swapped[k]; }); if (sw.length) q.push('ganti=' + sw.join(','));
-      if (fix.malam) q.push('malam=1');
-      $('[data-apply]').href = 's11c-jadwal-diterapkan.html' + (q.length ? '?' + q.join('&') : '');
-    }
+    // Terapkan: rencana + pilihan disimpan, lalu S11c membacanya dari penyimpanan
+    $('[data-apply]').addEventListener('click', function () {
+      Store.applyPlan({ ganti: Object.keys(swapped).filter(function (k) { return swapped[k]; }), malam: !!fix.malam });
+    });
   }
 
   /* ================= S11c Setelah diterapkan ================= */
   if (screen === 's11c') {
-    var ganti = (params.get('ganti') || '').split(',').filter(Boolean), malam = params.get('malam') === '1';
-    if (ganti.length || malam) {
-      var items = D.events.map(function (e) { return { kind: 'rutin', title: e.title, sub: e.where, s: E.toH(e.start), e: E.toH(e.end) }; });
-      items.push({ kind: 'mendadak', title: D.sudden.title + ' (mendadak)', sub: 'Kejadian mendadak', s: E.toH(D.sudden.start), e: E.toH(D.sudden.end) });
-      var outText = [];
-      D.plan.forEach(function (p) {
-        var slot = ganti.indexOf(p.task) > -1 ? p.alt[0] : p.to, tt = byId[p.task];
-        if (slot.day === 'Hari ini') items.push({ kind: 'blk', q: tt.quadrant, task: tt.id, title: tt.title, isNew: true, s: E.toH(slot.start), e: E.toH(slot.end),
-          sub: p.from ? 'Dipindah dari ' + E.hm(p.from.start) + ' · ' + tt.q.label : 'Dijadwalkan baru · ' + tt.q.label });
-        else outText.push(tt.title + ' dipindah ke ' + slot.day.toLowerCase() + ' ' + E.hm(slot.start) + '–' + E.hm(slot.end) + '.');
-      });
-      if (malam && !items.some(function (i) { return i.task === 'laporan' && i.s === 20; })) items.push({ kind: 'blk', q: 'Q1', task: 'laporan', title: byId.laporan.title, isNew: true, s: 20, e: 22, sub: 'Blok tambahan · Kerjakan Sekarang' });
-      // blok yang bertumpuk tidak boleh diam-diam saling menutupi
-      items.sort(function (a, b) { return a.s - b.s; });
-      for (var i = 1; i < items.length; i++) if (items[i].s < items[i - 1].e && items[i].kind === 'blk') { items[i].s = items[i - 1].e; }
-      $('[data-day]').outerHTML = R.dayView(items.filter(function (x) { return x.e > x.s; }), { nowH: NOWH, nowText: E.clock(NOW) });
-      $('[data-moved-out]').textContent = outText.join(' ') || 'Semua usulan dijadwalkan hari ini.';
-    }
     var sn = $('[data-autostart]'), timer = $('[data-timer]');
     if (sn && timer && timer.animate && !reduce) timer.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: 10000, easing: 'linear', fill: 'forwards' });
     if (sn) setTimeout(function () { sn.hidden = true; }, 10000);
@@ -405,7 +449,8 @@
 
   /* ================= S14 Profil ================= */
   if (screen === 's14') {
-    $$('[data-switch]').forEach(function (sw) { sw.addEventListener('click', function () { var on = sw.getAttribute('aria-checked') !== 'true'; sw.setAttribute('aria-checked', on); snack(on ? 'Email fail-safe aktif.' : 'Email fail-safe dimatikan. Pengingat merah hanya lewat HP.'); }); });
+    var swEl = $('[data-switch]'); if (swEl) swEl.setAttribute('aria-checked', String(!!D.settings.failsafeEmail));
+    $$('[data-switch]').forEach(function (sw) { sw.addEventListener('click', function () { var on = sw.getAttribute('aria-checked') !== 'true'; sw.setAttribute('aria-checked', on); Store.setSetting('failsafeEmail', on); snack(on ? 'Email fail-safe aktif.' : 'Email fail-safe dimatikan. Pengingat merah hanya lewat HP.'); }); });
     $('[data-export]').addEventListener('click', function () {
       var blob = new Blob([JSON.stringify({ diekspor: D.now, pengguna: D.user, pengaturan: D.settings, tugas: D.tasks }, null, 2)], { type: 'application/json' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'priora-data.json'; document.body.appendChild(a); a.click(); a.remove();
@@ -414,5 +459,11 @@
     var del = $('#del-confirm'), ok = $('[data-del-ok]');
     del.addEventListener('input', function () { ok.disabled = del.value.trim().toUpperCase() !== 'HAPUS'; });
     $('#dlg-del').addEventListener('close', function () { if (this.returnValue === 'ok') snack('Ini prototipe: tidak ada data yang dihapus.'); del.value = ''; ok.disabled = true; });
+    var rs = $('#dlg-reset');
+    if (rs) rs.addEventListener('close', function () { if (this.returnValue === 'ok') { Store.reset(); Store.say('Data contoh dikembalikan. Semua perubahanmu dihapus dari peramban ini.'); location.href = 's04-hari-ini.html'; } });
   }
+
+  /* ---------- mulai: gambar dari data tersimpan, lalu tampilkan pesan titipan ---------- */
+  if (screen === 's04' || screen === 's07' || screen === 's10' || screen === 's11c' || $('.behind .app')) mount();
+  showQueued();
 })();

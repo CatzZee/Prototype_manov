@@ -4,7 +4,7 @@
    SEMUA ISI DI SINI ADALAH CONTOH — ganti dengan data nyata sebelum uji pengguna. */
 (function (root) {
   var data = {
-    seedVersion: 1,
+    seedVersion: 1,               // naikkan bila isi contoh berubah: data tersimpan lama otomatis dibuang
     now: '2026-10-19T09:40',
     user: { name: 'Dimas Arya', email: 'dimas.arya@student.um.ac.id' },
     settings: {
